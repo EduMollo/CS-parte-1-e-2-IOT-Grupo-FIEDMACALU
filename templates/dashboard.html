@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CLYVO VET — Dashboard IoT</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --accent: #00b4ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --yellow: #d29922;
+      --text: #c9d1d9;
+      --muted: #8b949e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header img { height: 36px; }
+    header h1 { font-size: 1.2rem; color: var(--accent); letter-spacing: 1px; }
+    header span { font-size: 0.8rem; color: var(--muted); }
+    #status-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--muted); margin-left: auto;
+      transition: background 0.3s;
+    }
+    #status-dot.online { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+    main { padding: 24px 32px; display: grid; gap: 20px; }
+
+    /* Cards de métricas */
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--accent);
+    }
+    .card.alert::before { background: var(--red); }
+    .card-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .card-value { font-size: 2rem; font-weight: 700; color: var(--text); margin: 8px 0 4px; }
+    .card-unit  { font-size: 0.75rem; color: var(--muted); }
+    .card-icon  { position: absolute; right: 16px; top: 16px; font-size: 1.6rem; opacity: 0.15; }
+
+    /* Gráfico de histórico */
+    .chart-section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .chart-section h2 { font-size: 0.9rem; color: var(--muted); margin-bottom: 12px; }
+    canvas { width: 100% !important; }
+
+    /* Log de alertas */
+    .alerts-section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .alerts-section h2 { font-size: 0.9rem; color: var(--muted); margin-bottom: 12px; }
+    #alert-list { list-style: none; }
+    #alert-list li {
+      padding: 8px 12px;
+      border-left: 3px solid var(--red);
+      background: rgba(248, 81, 73, 0.07);
+      border-radius: 4px;
+      font-size: 0.82rem;
+      margin-bottom: 6px;
+      color: #ff8080;
+    }
+    #alert-list li.ok {
+      border-left-color: var(--green);
+      background: rgba(63, 185, 80, 0.07);
+      color: #7ee787;
+    }
+
+    /* Info do pet */
+    .pet-info {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .pet-avatar {
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, #0d2137, #003c6e);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem;
+    }
+    .pet-details h3 { font-size: 1.1rem; color: var(--text); }
+    .pet-details p  { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+    #last-update { font-size: 0.72rem; color: var(--muted); margin-left: auto; }
+
+    footer {
+      text-align: center;
+      padding: 16px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      margin-top: 24px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div style="font-size:1.6rem">🐾</div>
+  <div>
+    <h1>CLYVO VET — Pet Health Dashboard</h1>
+    <span>FIAP 2026 · Disruptive Architectures: IoT, IoB &amp; IA Generativa</span>
+  </div>
+  <div id="status-dot" title="Status da conexão"></div>
+</header>
+
+<main>
+
+  <!-- Pet Info -->
+  <div class="pet-info">
+    <div class="pet-avatar" id="pet-avatar">🐕</div>
+    <div class="pet-details">
+      <h3 id="pet-name">–</h3>
+      <p id="pet-species">Espécie: –</p>
+    </div>
+    <span id="last-update">Aguardando dados...</span>
+  </div>
+
+  <!-- Métricas -->
+  <div class="metrics">
+    <div class="card" id="card-temp">
+      <div class="card-icon">🌡️</div>
+      <div class="card-label">Temperatura</div>
+      <div class="card-value" id="val-temp">–</div>
+      <div class="card-unit">°C</div>
+    </div>
+    <div class="card" id="card-hr">
+      <div class="card-icon">❤️</div>
+      <div class="card-label">Freq. Cardíaca</div>
+      <div class="card-value" id="val-hr">–</div>
+      <div class="card-unit">bpm</div>
+    </div>
+    <div class="card" id="card-spo2">
+      <div class="card-icon">💧</div>
+      <div class="card-label">SpO₂</div>
+      <div class="card-value" id="val-spo2">–</div>
+      <div class="card-unit">%</div>
+    </div>
+    <div class="card" id="card-hum">
+      <div class="card-icon">🌫️</div>
+      <div class="card-label">Umidade Amb.</div>
+      <div class="card-value" id="val-hum">–</div>
+      <div class="card-unit">%</div>
+    </div>
+  </div>
+
+  <!-- Gráfico Temperatura -->
+  <div class="chart-section">
+    <h2>Histórico — Temperatura (°C) e FC (bpm)</h2>
+    <canvas id="chart" height="80"></canvas>
+  </div>
+
+  <!-- Alertas -->
+  <div class="alerts-section">
+    <h2>Log de Alertas</h2>
+    <ul id="alert-list"><li class="ok">Sem alertas registrados.</li></ul>
+  </div>
+
+</main>
+
+<footer>CLYVO VET · FIAP Challenge 2026 · Sprint 1 · IoT &amp; Computer Vision</footer>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+  // ── Gráfico ──────────────────────────────────────────────────────────────
+  const ctx = document.getElementById('chart').getContext('2d');
+  const MAX_POINTS = 40;
+  const labels = [];
+  const tempData = [];
+  const hrData = [];
+
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Temperatura (°C)',
+          data: tempData,
+          borderColor: '#00b4ff',
+          backgroundColor: 'rgba(0,180,255,0.07)',
+          tension: 0.4,
+          pointRadius: 2,
+          yAxisID: 'yTemp',
+        },
+        {
+          label: 'Freq. Cardíaca (bpm)',
+          data: hrData,
+          borderColor: '#f85149',
+          backgroundColor: 'rgba(248,81,73,0.07)',
+          tension: 0.4,
+          pointRadius: 2,
+          yAxisID: 'yHR',
+        },
+      ]
+    },
+    options: {
+      animation: false,
+      plugins: { legend: { labels: { color: '#8b949e', font: { size: 11 } } } },
+      scales: {
+        x:     { ticks: { color: '#8b949e', font: { size: 10 }, maxTicksLimit: 8 }, grid: { color: '#21262d' } },
+        yTemp: { position: 'left',  ticks: { color: '#00b4ff', font: { size: 10 } }, grid: { color: '#21262d' } },
+        yHR:   { position: 'right', ticks: { color: '#f85149', font: { size: 10 } }, grid: { drawOnChartArea: false } },
+      }
+    }
+  });
+
+  function pushPoint(ts, temp, hr) {
+    const label = ts.slice(11, 19);
+    labels.push(label);
+    tempData.push(temp);
+    hrData.push(hr);
+    if (labels.length > MAX_POINTS) {
+      labels.shift(); tempData.shift(); hrData.shift();
+    }
+    chart.update('none');
+  }
+
+  // ── Alertas ───────────────────────────────────────────────────────────────
+  const alertList = document.getElementById('alert-list');
+  const alertLog = [];
+
+  function addAlert(msg, isOk = false) {
+    alertLog.unshift({ msg, isOk, ts: new Date().toLocaleTimeString('pt-BR') });
+    renderAlerts();
+  }
+
+  function renderAlerts() {
+    alertList.innerHTML = '';
+    const items = alertLog.slice(0, 8);
+    if (!items.length) {
+      alertList.innerHTML = '<li class="ok">Sem alertas registrados.</li>';
+      return;
+    }
+    items.forEach(({ msg, isOk, ts }) => {
+      const li = document.createElement('li');
+      li.className = isOk ? 'ok' : '';
+      li.textContent = `[${ts}] ${msg}`;
+      alertList.appendChild(li);
+    });
+  }
+
+  // ── SSE ───────────────────────────────────────────────────────────────────
+  const dot = document.getElementById('status-dot');
+
+  function connect() {
+    const es = new EventSource('/stream');
+    es.onopen = () => dot.classList.add('online');
+    es.onerror = () => {
+      dot.classList.remove('online');
+      setTimeout(connect, 4000);
+    };
+    es.onmessage = (e) => {
+      const d = JSON.parse(e.data);
+      updateUI(d);
+    };
+  }
+
+  function updateUI(d) {
+    // Pet info
+    document.getElementById('pet-name').textContent    = d.pet_name || '–';
+    document.getElementById('pet-species').textContent = 'Espécie: ' + (d.species === 'dog' ? 'Cão' : d.species === 'cat' ? 'Gato' : d.species || '–');
+    document.getElementById('pet-avatar').textContent  = d.species === 'cat' ? '🐈' : '🐕';
+    document.getElementById('last-update').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
+
+    // Métricas
+    document.getElementById('val-temp').textContent = d.temperature_c ?? '–';
+    document.getElementById('val-hr').textContent   = d.heart_rate_bpm ?? '–';
+    document.getElementById('val-spo2').textContent = d.spo2_pct ?? '–';
+    document.getElementById('val-hum').textContent  = d.humidity_pct ?? '–';
+
+    // Alertas visuais nos cards
+    const normalRanges = {
+      dog: { temp: [37.5, 39.2], hr: [60, 140] },
+      cat: { temp: [37.8, 39.2], hr: [120, 220] },
+    };
+    const r = normalRanges[d.species] || normalRanges.dog;
+    toggleAlert('card-temp', d.temperature_c < r.temp[0] || d.temperature_c > r.temp[1]);
+    toggleAlert('card-hr',   d.heart_rate_bpm < r.hr[0]  || d.heart_rate_bpm  > r.hr[1]);
+
+    // Gráfico
+    if (d.timestamp) pushPoint(d.timestamp, d.temperature_c, d.heart_rate_bpm);
+
+    // Log de alertas
+    if (d.alerts && d.alerts.length) {
+      d.alerts.forEach(a => addAlert(a));
+    } else {
+      addAlert('Sinais vitais normais — ' + (d.pet_name || ''), true);
+    }
+  }
+
+  function toggleAlert(cardId, isAlert) {
+    const el = document.getElementById(cardId);
+    if (isAlert) el.classList.add('alert');
+    else el.classList.remove('alert');
+  }
+
+  // Carrega histórico ao abrir
+  fetch('/api/history')
+    .then(r => r.json())
+    .then(data => data.forEach(updateUI))
+    .catch(() => {});
+
+  connect();
+</script>
+</body>
+</html>
