@@ -127,7 +127,13 @@ python pet_detection.py caminho/imagem.jpg
 
 ## 🎥 Vídeo de Demonstração
 
-> Link do YouTube: *(https://youtu.be/gApzF3kRXaw)*
+> Link do YouTube: *https://youtu.be/gApzF3kRXaw*
+
+---
+
+## 🔗 Repositório
+
+> Link do GitHub: *https://github.com/EduMollo/CS-parte-1-e-2-IOT-Grupo-FIEDMACALU*
 
 ---
 
